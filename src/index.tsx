@@ -310,7 +310,7 @@ app.get("/", (c) => {
             </li>
             <li>
               The SQLite database will be automatically persisted in a Docker
-              volume
+              volume at <code>/app/data</code>
             </li>
           </ol>
 
@@ -322,9 +322,9 @@ app.get("/", (c) => {
               borderRadius: "0.5rem",
             }}
           >
-            <strong>Note:</strong> This server uses secure password hashing and
-            follows KOReader's authentication protocol to ensure your reading
-            data remains private and secure.
+            <strong>Note:</strong> This server allows registration by any
+            username and password. It does not require any authentication to
+            access the sync server.
           </p>
         </div>
       </body>
