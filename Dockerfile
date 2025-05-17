@@ -30,6 +30,7 @@ RUN bun run build
 FROM base AS release
 WORKDIR /app
 COPY --from=prerelease /usr/src/app/server.js .
+COPY --from=prerelease /usr/src/app/public/ ./public
 ENV NODE_ENV=production
 
 # Install wget and set up permissions

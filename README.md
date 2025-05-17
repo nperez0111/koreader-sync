@@ -1,10 +1,55 @@
 # Koreader Sync
 
-A KOReader sync server implementation using Bun and Hono.
+<div style="display: flex; align-items: flex-start; gap: 2rem;">
+  <img src="./public/logo.jpg" alt="KOReader Sync Server" width="150">
+  <p style="margin: 0;">A KOReader sync server implementation using Bun and Hono.</p>
+</div>
 
-## Setup
+## Self-Hosting Guide
 
-### Local Development
+The easiest way to self-host this sync server is using Docker Compose:
+
+1. Create a new directory for your sync server:
+
+```bash
+mkdir koreader-sync && cd koreader-sync
+```
+
+2. Create a `docker-compose.yml` file with the following content:
+
+```yaml
+services:
+  kosync:
+    image: ghcr.io/nperez0111/koreader-sync:latest
+    container_name: kosync
+    ports:
+      - 3000:3000
+    healthcheck:
+      test: ["CMD", "wget" ,"--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 5m
+      timeout: 3s
+    restart: unless-stopped
+    volumes:
+      - data:/app/data
+```
+
+3. Start the server:
+
+```bash
+docker compose up -d
+```
+
+Your sync server will now be running at `http://localhost:3000`. The SQLite database will be automatically persisted in a Docker volume.
+
+### Connecting Your KOReader Device
+
+1. Open a document on your KOReader device and navigate to Settings → Progress Sync → Custom sync server
+2. Enter your server's URL (e.g., `http://localhost:3000` if running locally)
+3. Select "Register / Login" to create an account or sign in
+4. Test the connection by selecting "Push progress from this device now"
+5. Enable automatic progress syncing in the settings if desired
+
+## Local Development
 
 1. Install dependencies:
 
@@ -25,34 +70,6 @@ HOST="0.0.0.0"
 
 ```bash
 bun run dev
-```
-
-### Docker Deployment
-
-1. Create a `.env` file with your environment variables:
-
-```bash
-PASSWORD_SALT="your_secure_random_string"
-```
-
-2. Build and run with Docker Compose:
-
-```bash
-docker compose up -d
-```
-
-The server will be available at `http://localhost:3000`. The SQLite database will be stored in the `./data` directory.
-
-To view logs:
-
-```bash
-docker compose logs -f
-```
-
-To stop the server:
-
-```bash
-docker compose down
 ```
 
 ## API Endpoints
