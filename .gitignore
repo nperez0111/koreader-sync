@@ -1,0 +1,5 @@
+# deps
+node_modules/
+.env
+*.db
+server.js
