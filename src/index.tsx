@@ -3,21 +3,14 @@ import { serveStatic } from "hono/bun";
 import { HTTPException } from "hono/http-exception";
 import { db } from "./db";
 import { authMiddleware } from "./auth";
-import { RegisterRequest, ProgressUpdateRequest } from "./types";
+import type { RegisterRequest, ProgressUpdateRequest } from "./types";
 import config from "./config";
-import { jsx } from "hono/jsx";
 
 type Variables = {
   userId: number;
 };
 
 const app = new Hono<{ Variables: Variables }>();
-
-// Helper function to hash password with salt
-async function hashPasswordWithSalt(password: string): Promise<string> {
-  const saltedPassword = password + config.password.salt;
-  return await Bun.password.hash(saltedPassword);
-}
 
 // Register endpoint
 app.post("/users/create", async (c) => {
@@ -30,7 +23,8 @@ app.post("/users/create", async (c) => {
   }
 
   try {
-    const hashedPassword = await hashPasswordWithSalt(body.password);
+    const saltedPassword = body.password + config.password.salt;
+    const hashedPassword = await Bun.password.hash(saltedPassword);
     db.prepare("INSERT INTO users (username, password) VALUES (?, ?)").run(
       body.username,
       hashedPassword
@@ -119,6 +113,7 @@ app.get("/syncs/progress/:document", authMiddleware, (c) => {
 app.get("/health", (c) => {
   return c.json({ status: "ok" });
 });
+
 app.get("/", (c) => {
   return c.html(
     <html>

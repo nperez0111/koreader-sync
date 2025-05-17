@@ -1,8 +1,8 @@
-import { Context, Next } from "hono";
+import type { Context, Next } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { db } from "./db";
 import config from "./config";
-import { User } from "./types";
+import type { User } from "./types";
 
 type Variables = {
   userId: number;
