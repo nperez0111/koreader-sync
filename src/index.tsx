@@ -136,6 +136,31 @@ app.get("/", (c) => {
         server for KOReader devices, built with Bun and Hono.
       </p>
 
+      <p
+        style={{
+          marginBottom: "2rem",
+          padding: "0.75rem",
+          backgroundColor: "#f0f9ff",
+          borderRadius: "0.5rem",
+          display: "inline-block",
+        }}
+      >
+        <a
+          href="https://github.com/nperez0111/koreader-sync"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            color: "#2563eb",
+            textDecoration: "none",
+            display: "flex",
+            alignItems: "center",
+            gap: "0.5rem",
+          }}
+        >
+          📦 View source code on GitHub
+        </a>
+      </p>
+
       <h2>Getting Started</h2>
       <p>To use this sync server with your KOReader device:</p>
       <ol>
@@ -147,6 +172,57 @@ app.get("/", (c) => {
         <li>Select "Generic WebDAV/HTTP Sync Server"</li>
         <li>Enter this server's URL as the server address</li>
         <li>Use your chosen username and password for authentication</li>
+      </ol>
+
+      <h2>Self-Hosting Guide</h2>
+      <p>Want to run your own sync server? It's easy with Docker Compose!</p>
+
+      <div
+        style={{
+          backgroundColor: "#1e1e1e",
+          padding: "1rem",
+          borderRadius: "0.5rem",
+          overflow: "auto",
+          marginBottom: "1rem",
+        }}
+      >
+        <pre
+          style={{
+            color: "#d4d4d4",
+            margin: 0,
+            fontFamily: "monospace",
+          }}
+        >
+          {`services:
+  kosync:
+    image: ghcr.io/nperez0111/koreader-sync:latest
+    container_name: kosync
+    ports:
+      - 3000:3000
+    healthcheck:
+      test: ["CMD", "wget" ,"--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 5m
+      timeout: 3s
+    restart: unless-stopped
+    volumes:
+      - data:/app/data`}
+        </pre>
+      </div>
+
+      <ol style={{ marginBottom: "2rem" }}>
+        <li>Create a new directory for your sync server</li>
+        <li>
+          Save the above configuration as <code>docker-compose.yml</code>
+        </li>
+        <li>
+          Run <code>docker compose up -d</code> to start the server
+        </li>
+        <li>
+          Your server will be available at <code>http://localhost:3000</code>
+        </li>
+        <li>
+          The SQLite database will be automatically persisted in a Docker volume
+        </li>
       </ol>
 
       <p

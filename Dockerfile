@@ -32,7 +32,12 @@ WORKDIR /app
 COPY --from=prerelease /usr/src/app/server.js .
 ENV NODE_ENV=production
 
-RUN mkdir -p data && chown -R bun:bun data && chmod 770 data
+# Install wget and set up permissions
+RUN apk add --no-cache wget && \
+  mkdir -p data && \
+  chown -R bun:bun /app && \
+  chmod 755 /app
+
 USER bun
 EXPOSE 3000/tcp
 ENTRYPOINT [ "bun", "run", "server.js" ]
