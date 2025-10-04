@@ -1,6 +1,8 @@
 import { Hono } from "hono";
 import { serveStatic } from "hono/bun";
 import { HTTPException } from "hono/http-exception";
+import { requestId } from "hono/request-id";
+import type { RequestIdVariables } from "hono/request-id";
 import { db } from "./db";
 import { authMiddleware } from "./auth";
 import { loggingMiddleware, errorHandler } from "./middleware";
@@ -10,9 +12,12 @@ import config from "./config";
 
 type Variables = {
   userId: number;
-};
+} & RequestIdVariables;
 
 const app = new Hono<{ Variables: Variables }>();
+
+// Add request ID middleware
+app.use("*", requestId());
 
 // Add logging middleware
 app.use("*", loggingMiddleware);
@@ -23,12 +28,13 @@ app.onError(errorHandler);
 // Register endpoint
 app.post("/users/create", async (c) => {
   const body = await c.req.json<RegisterRequest>();
+  const requestId = c.get("requestId");
 
-  logger.info({ username: body.username }, "User registration attempt");
+  logger.info({ requestId, username: body.username }, "User registration attempt");
 
   if (!body.username || !body.password) {
     logger.warn(
-      { username: body.username },
+      { requestId, username: body.username },
       "Registration failed: missing credentials"
     );
     throw new HTTPException(400, {
@@ -44,11 +50,12 @@ app.post("/users/create", async (c) => {
       hashedPassword
     );
 
-    logger.info({ username: body.username }, "User registered successfully");
+    logger.info({ requestId, username: body.username }, "User registered successfully");
     return c.json({ status: "success" }, 201);
   } catch (error) {
     logger.warn(
       {
+        requestId,
         username: body.username,
         error: error instanceof Error ? error.message : String(error),
       },
@@ -61,19 +68,22 @@ app.post("/users/create", async (c) => {
 // Auth endpoint
 app.get("/users/auth", authMiddleware, (c) => {
   const userId = c.get("userId");
-  logger.info({ userId }, "User authentication successful");
+  const requestId = c.get("requestId");
+  logger.info({ requestId, userId }, "User authentication successful");
   return c.json({ status: "authenticated" });
 });
 
 // Update progress endpoint
 app.put("/syncs/progress", authMiddleware, async (c) => {
   const userId = c.get("userId");
+  const requestId = c.get("requestId");
   const body = await c.req.json<ProgressUpdateRequest>();
 
   const { document, progress, percentage, device, device_id } = body;
 
   logger.info(
     {
+      requestId,
       userId,
       document,
       percentage,
@@ -91,7 +101,7 @@ app.put("/syncs/progress", authMiddleware, async (c) => {
     !device_id
   ) {
     logger.warn(
-      { userId, body },
+      { requestId, userId, body },
       "Progress update failed: missing required fields"
     );
     throw new HTTPException(400, { message: "Missing required fields" });
@@ -125,6 +135,7 @@ app.put("/syncs/progress", authMiddleware, async (c) => {
 
     logger.info(
       {
+        requestId,
         userId,
         document,
         percentage,
@@ -138,6 +149,7 @@ app.put("/syncs/progress", authMiddleware, async (c) => {
   } catch (error) {
     logger.error(
       {
+        requestId,
         userId,
         document,
         error: error instanceof Error ? error.message : String(error),
@@ -151,9 +163,10 @@ app.put("/syncs/progress", authMiddleware, async (c) => {
 // Get progress endpoint
 app.get("/syncs/progress/:document", authMiddleware, (c) => {
   const userId = c.get("userId");
+  const requestId = c.get("requestId");
   const document = c.req.param("document");
 
-  logger.info({ userId, document }, "Progress retrieval requested");
+  logger.info({ requestId, userId, document }, "Progress retrieval requested");
 
   try {
     const progress = db
@@ -169,12 +182,13 @@ app.get("/syncs/progress/:document", authMiddleware, (c) => {
       .get(userId as number, document);
 
     if (!progress) {
-      logger.info({ userId, document }, "Progress not found");
+      logger.info({ requestId, userId, document }, "Progress not found");
       return c.json({ status: "not found" }, 404);
     }
 
     logger.info(
       {
+        requestId,
         userId,
         document,
         percentage: (progress as any).percentage,
@@ -187,6 +201,7 @@ app.get("/syncs/progress/:document", authMiddleware, (c) => {
   } catch (error) {
     logger.error(
       {
+        requestId,
         userId,
         document,
         error: error instanceof Error ? error.message : String(error),
@@ -198,7 +213,8 @@ app.get("/syncs/progress/:document", authMiddleware, (c) => {
 });
 
 app.get("/health", (c) => {
-  logger.debug("Health check requested");
+  const requestId = c.get("requestId");
+  logger.debug({ requestId }, "Health check requested");
   return c.json({ status: "ok" });
 });
 

@@ -15,7 +15,7 @@ const logger = pino({
         }
       : undefined,
   serializers: {
-    req: (req: Request) => ({
+    req: (req: any) => ({
       method: req.method,
       url: req.url,
       headers: {
@@ -24,7 +24,7 @@ const logger = pino({
         authorization: req.headers["authorization"] ? "[REDACTED]" : undefined,
       },
     }),
-    res: (res: Response) => ({
+    res: (res: any) => ({
       statusCode: res.statusCode,
       headers: {
         "content-type": res.headers["content-type"],
