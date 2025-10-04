@@ -3,6 +3,8 @@ import { serveStatic } from "hono/bun";
 import { HTTPException } from "hono/http-exception";
 import { db } from "./db";
 import { authMiddleware } from "./auth";
+import { loggingMiddleware, errorHandler } from "./middleware";
+import logger from "./logger";
 import type { RegisterRequest, ProgressUpdateRequest } from "./types";
 import config from "./config";
 
@@ -12,11 +14,23 @@ type Variables = {
 
 const app = new Hono<{ Variables: Variables }>();
 
+// Add logging middleware
+app.use("*", loggingMiddleware);
+
+// Add error handler
+app.onError(errorHandler);
+
 // Register endpoint
 app.post("/users/create", async (c) => {
   const body = await c.req.json<RegisterRequest>();
 
+  logger.info({ username: body.username }, "User registration attempt");
+
   if (!body.username || !body.password) {
+    logger.warn(
+      { username: body.username },
+      "Registration failed: missing credentials"
+    );
     throw new HTTPException(400, {
       message: "Username and password are required",
     });
@@ -30,14 +44,24 @@ app.post("/users/create", async (c) => {
       hashedPassword
     );
 
+    logger.info({ username: body.username }, "User registered successfully");
     return c.json({ status: "success" }, 201);
   } catch (error) {
+    logger.warn(
+      {
+        username: body.username,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      "Registration failed: username already exists"
+    );
     return c.json({ error: "Username already exists" }, 402);
   }
 });
 
 // Auth endpoint
 app.get("/users/auth", authMiddleware, (c) => {
+  const userId = c.get("userId");
+  logger.info({ userId }, "User authentication successful");
   return c.json({ status: "authenticated" });
 });
 
@@ -48,6 +72,17 @@ app.put("/syncs/progress", authMiddleware, async (c) => {
 
   const { document, progress, percentage, device, device_id } = body;
 
+  logger.info(
+    {
+      userId,
+      document,
+      percentage,
+      device,
+      device_id,
+    },
+    "Progress update received"
+  );
+
   if (
     !document ||
     !progress ||
@@ -55,35 +90,62 @@ app.put("/syncs/progress", authMiddleware, async (c) => {
     !device ||
     !device_id
   ) {
+    logger.warn(
+      { userId, body },
+      "Progress update failed: missing required fields"
+    );
     throw new HTTPException(400, { message: "Missing required fields" });
   }
 
   const timestamp = Math.floor(Date.now() / 1000);
 
-  db.prepare(
+  try {
+    db.prepare(
+      `
+      INSERT OR REPLACE INTO progress (
+        user_id, 
+        document, 
+        progress, 
+        percentage, 
+        device, 
+        device_id, 
+        timestamp
+      ) 
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `
-    INSERT OR REPLACE INTO progress (
-      user_id, 
-      document, 
-      progress, 
-      percentage, 
-      device, 
-      device_id, 
+    ).run(
+      userId as number,
+      document,
+      progress,
+      percentage,
+      device,
+      device_id,
       timestamp
-    ) 
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `
-  ).run(
-    userId as number,
-    document,
-    progress,
-    percentage,
-    device,
-    device_id,
-    timestamp
-  );
+    );
 
-  return c.json({ status: "success" }, 200);
+    logger.info(
+      {
+        userId,
+        document,
+        percentage,
+        device,
+        device_id,
+      },
+      "Progress updated successfully"
+    );
+
+    return c.json({ status: "success" }, 200);
+  } catch (error) {
+    logger.error(
+      {
+        userId,
+        document,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      "Failed to update progress"
+    );
+    throw error;
+  }
 });
 
 // Get progress endpoint
@@ -91,26 +153,52 @@ app.get("/syncs/progress/:document", authMiddleware, (c) => {
   const userId = c.get("userId");
   const document = c.req.param("document");
 
-  const progress = db
-    .prepare(
-      `
-    SELECT progress, percentage, device, device_id, timestamp
-    FROM progress
-    WHERE user_id = ? AND document = ?
-    ORDER BY timestamp DESC
-    LIMIT 1
-  `
-    )
-    .get(userId as number, document);
+  logger.info({ userId, document }, "Progress retrieval requested");
 
-  if (!progress) {
-    return c.json({ status: "not found" }, 404);
+  try {
+    const progress = db
+      .prepare(
+        `
+      SELECT progress, percentage, device, device_id, timestamp
+      FROM progress
+      WHERE user_id = ? AND document = ?
+      ORDER BY timestamp DESC
+      LIMIT 1
+    `
+      )
+      .get(userId as number, document);
+
+    if (!progress) {
+      logger.info({ userId, document }, "Progress not found");
+      return c.json({ status: "not found" }, 404);
+    }
+
+    logger.info(
+      {
+        userId,
+        document,
+        percentage: (progress as any).percentage,
+        device: (progress as any).device,
+      },
+      "Progress retrieved successfully"
+    );
+
+    return c.json(progress);
+  } catch (error) {
+    logger.error(
+      {
+        userId,
+        document,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      "Failed to retrieve progress"
+    );
+    throw error;
   }
-
-  return c.json(progress);
 });
 
 app.get("/health", (c) => {
+  logger.debug("Health check requested");
   return c.json({ status: "ok" });
 });
 
@@ -341,5 +429,8 @@ app.use(
     },
   })
 );
+
+// Log startup
+logger.info("KOReader Sync Server starting up");
 
 export default app;

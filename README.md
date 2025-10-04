@@ -72,6 +72,41 @@ HOST="0.0.0.0"
 bun run dev
 ```
 
+## Logging
+
+The application uses Pino for structured logging. Logs are output in JSON format in production and pretty-printed in development.
+
+### Log Levels
+
+- `debug`: Detailed information for debugging (health checks, auth attempts)
+- `info`: General information about application flow (user actions, successful operations)
+- `warn`: Warning messages (authentication failures, validation errors)
+- `error`: Error messages (database errors, unhandled exceptions)
+
+### Environment Variables
+
+- `LOG_LEVEL`: Set the minimum log level (default: `info`)
+- `NODE_ENV`: Set to `development` for pretty-printed logs, `production` for JSON logs
+
+### Example Log Output
+
+```json
+{
+  "level": 30,
+  "time": 1703123456789,
+  "msg": "User registered successfully",
+  "username": "john_doe"
+}
+```
+
+### Logging Features
+
+- **Request/Response Logging**: All HTTP requests and responses are automatically logged
+- **Structured Data**: All logs include relevant context (user IDs, document names, etc.)
+- **Error Tracking**: Comprehensive error logging with stack traces
+- **Performance Monitoring**: Request duration tracking
+- **Security**: Sensitive data like passwords are never logged
+
 ## API Endpoints
 
 ### Register User
