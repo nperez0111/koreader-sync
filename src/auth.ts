@@ -20,7 +20,10 @@ export async function authMiddleware(
   logger.debug({ requestId, username }, "Authentication attempt");
 
   if (!username || !password) {
-    logger.warn({ requestId, username }, "Authentication failed: missing credentials");
+    logger.warn(
+      { requestId, username },
+      "Authentication failed: missing credentials"
+    );
     throw new HTTPException(401, { message: "Authentication required" });
   }
 
@@ -30,11 +33,17 @@ export async function authMiddleware(
 
   const saltedPassword = password + config.password.salt;
   if (!user || !(await Bun.password.verify(saltedPassword, user.password))) {
-    logger.warn({ requestId, username }, "Authentication failed: invalid credentials");
+    logger.warn(
+      { requestId, username },
+      "Authentication failed: invalid credentials"
+    );
     throw new HTTPException(401, { message: "Invalid credentials" });
   }
 
-  logger.info({ requestId, userId: user.id, username }, "Authentication successful");
+  logger.info(
+    { requestId, userId: user.id, username },
+    "Authentication successful"
+  );
   c.set("userId", user.id);
   await next();
 }

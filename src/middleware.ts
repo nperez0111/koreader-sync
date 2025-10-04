@@ -57,7 +57,7 @@ export const loggingMiddleware = async (c: Context, next: Next) => {
 
 export const errorHandler = (error: Error, c: Context) => {
   const requestId = c.get("requestId");
-  
+
   logger.error(
     {
       requestId,

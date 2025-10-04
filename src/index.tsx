@@ -3,6 +3,7 @@ import { serveStatic } from "hono/bun";
 import { HTTPException } from "hono/http-exception";
 import { requestId } from "hono/request-id";
 import type { RequestIdVariables } from "hono/request-id";
+import { secureHeaders } from "hono/secure-headers";
 import { db } from "./db";
 import { authMiddleware } from "./auth";
 import { loggingMiddleware, errorHandler } from "./middleware";
@@ -15,6 +16,30 @@ type Variables = {
 } & RequestIdVariables;
 
 const app = new Hono<{ Variables: Variables }>();
+
+// Add secure headers middleware
+app.use(
+  "*",
+  secureHeaders({
+    // Disable X-Frame-Options for API endpoints (not needed for JSON API)
+    xFrameOptions: false,
+    // Keep X-XSS-Protection disabled (modern browsers handle this better)
+    xXssProtection: false,
+    // Set a more restrictive CSP for the HTML landing page
+    contentSecurityPolicy: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:"],
+      fontSrc: ["'self'"],
+      connectSrc: ["'self'"],
+      frameSrc: ["'none'"],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
+    },
+  })
+);
 
 // Add request ID middleware
 app.use("*", requestId());
@@ -30,7 +55,10 @@ app.post("/users/create", async (c) => {
   const body = await c.req.json<RegisterRequest>();
   const requestId = c.get("requestId");
 
-  logger.info({ requestId, username: body.username }, "User registration attempt");
+  logger.info(
+    { requestId, username: body.username },
+    "User registration attempt"
+  );
 
   if (!body.username || !body.password) {
     logger.warn(
@@ -50,7 +78,10 @@ app.post("/users/create", async (c) => {
       hashedPassword
     );
 
-    logger.info({ requestId, username: body.username }, "User registered successfully");
+    logger.info(
+      { requestId, username: body.username },
+      "User registered successfully"
+    );
     return c.json({ status: "success" }, 201);
   } catch (error) {
     logger.warn(
