@@ -99,3 +99,7 @@ jobs:
           subject-name: ghcr.io/${{ env.IMAGE_NAME }}
           subject-digest: ${{ steps.build-and-push.outputs.digest }}
           push-to-registry: true
+
+      - name: Deploy to Portainer
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: curl -X POST https://portainer.nickthesick.com/api/stacks/webhooks/5d360aa6-d0d6-4d64-8cf5-0ce6b0494ed3
