@@ -18,17 +18,23 @@ const logger = pino({
     req: (req: any) => ({
       method: req.method,
       url: req.url,
-      headers: {
-        "user-agent": req.headers["user-agent"],
-        "content-type": req.headers["content-type"],
-        authorization: req.headers["authorization"] ? "[REDACTED]" : undefined,
-      },
+      headers: req.headers
+        ? {
+            "user-agent": req.headers["user-agent"],
+            "content-type": req.headers["content-type"],
+            authorization: req.headers["authorization"]
+              ? "[REDACTED]"
+              : undefined,
+          }
+        : undefined,
     }),
     res: (res: any) => ({
       statusCode: res.statusCode,
-      headers: {
-        "content-type": res.headers["content-type"],
-      },
+      headers: res.headers
+        ? {
+            "content-type": res.headers["content-type"],
+          }
+        : undefined,
     }),
   },
 });

@@ -13,7 +13,7 @@ export const loggingMiddleware = async (c: Context, next: Next) => {
       req: {
         method,
         url,
-        headers: c.req.raw.headers,
+        headers: c.req.raw?.headers || {},
       },
     },
     "Incoming request"
@@ -31,7 +31,7 @@ export const loggingMiddleware = async (c: Context, next: Next) => {
         requestId,
         res: {
           statusCode: status,
-          headers: c.res.headers,
+          headers: c.res.headers || {},
         },
         duration,
       },
