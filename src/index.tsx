@@ -82,7 +82,7 @@ app.post("/users/create", async (c) => {
       { requestId, username: body.username },
       "User registered successfully"
     );
-    return c.json({ status: "success" }, 201);
+    return c.json({ username: body.username }, 201);
   } catch (error) {
     logger.warn(
       {
@@ -101,7 +101,7 @@ app.get("/users/auth", authMiddleware, (c) => {
   const userId = c.get("userId");
   const requestId = c.get("requestId");
   logger.info({ requestId, userId }, "User authentication successful");
-  return c.json({ status: "authenticated" });
+  return c.json({ authorized: "OK" });
 });
 
 // Update progress endpoint
@@ -144,14 +144,14 @@ app.put("/syncs/progress", authMiddleware, async (c) => {
     db.prepare(
       `
       INSERT OR REPLACE INTO progress (
-        user_id, 
-        document, 
-        progress, 
-        percentage, 
-        device, 
-        device_id, 
+        user_id,
+        document,
+        progress,
+        percentage,
+        device,
+        device_id,
         timestamp
-      ) 
+      )
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `
     ).run(
