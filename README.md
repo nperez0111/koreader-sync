@@ -31,6 +31,9 @@ services:
     restart: unless-stopped
     volumes:
       - data:/app/data
+
+volumes:
+  data:
 ```
 
 3. Start the server:
