@@ -25,7 +25,7 @@ services:
     ports:
       - 3000:3000
     healthcheck:
-      test: ["CMD", "wget" ,"--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
+      test: ["CMD", "wget" ,"--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
       interval: 5m
       timeout: 3s
     restart: unless-stopped
