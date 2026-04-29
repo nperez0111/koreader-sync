@@ -145,9 +145,16 @@ The application uses Pino for structured logging. Logs are output in JSON format
   "progress": "/body/DocFragment[15]/body/div[65]/text()[1].41",
   "percentage": 0.2082,
   "device": "boox",
-  "device_id": "197E7C6B3FD54A749C87DE9C1B05A3CE"
+  "device_id": "197E7C6B3FD54A749C87DE9C1B05A3CE",
+  "metadata": {
+    "filename": "the_great_gatsby.epub",
+    "title": "The Great Gatsby",
+    "authors": "F. Scott Fitzgerald"
+  }
 }
 ```
+
+The `metadata` field is optional. KOReader sends it only when the user enables the "Send document metadata" toggle in the KOSync settings (see [koreader/koreader#15306](https://github.com/koreader/koreader/pull/15306)). When omitted, previously stored metadata for the document is preserved.
 
 - **Response**: 200 (OK) or 401 (Unauthorized)
 
@@ -159,6 +166,37 @@ The application uses Pino for structured logging. Logs are output in JSON format
   - `x-auth-key`: Password/API Key
   - `accept`: application/vnd.koreader.v1+json
 - **Response**: 200 (OK) with progress data or 404 (Not Found)
+
+### List Documents
+
+Returns every document the authenticated user has synced, including any captured metadata, ordered by most recently updated. This endpoint is specific to this server — the official KOReader client does not call it, but it is useful for building dashboards or browsing your synced library.
+
+- **GET** `/syncs/documents`
+- **Headers**:
+  - `x-auth-user`: Username
+  - `x-auth-key`: Password/API Key
+  - `accept`: application/vnd.koreader.v1+json
+- **Response**: 200 (OK)
+
+```json
+{
+  "documents": [
+    {
+      "document": "8b03a82761fae0ee6cd5a23700361e74",
+      "progress": "/body/DocFragment[15]/body/div[65]/text()[1].41",
+      "percentage": 0.2082,
+      "device": "boox",
+      "device_id": "197E7C6B3FD54A749C87DE9C1B05A3CE",
+      "filename": "the_great_gatsby.epub",
+      "title": "The Great Gatsby",
+      "authors": "F. Scott Fitzgerald",
+      "timestamp": 1703123456
+    }
+  ]
+}
+```
+
+`filename`, `title`, and `authors` will be `null` for documents synced before metadata was sent (or when the KOReader toggle is off).
 
 ## Security Features
 

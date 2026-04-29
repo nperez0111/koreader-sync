@@ -5,6 +5,12 @@ export interface User {
   created_at: Date;
 }
 
+export interface DocumentMetadata {
+  filename?: string;
+  title?: string;
+  authors?: string;
+}
+
 export interface Progress {
   id: number;
   user_id: number;
@@ -13,6 +19,9 @@ export interface Progress {
   percentage: number;
   device: string;
   device_id: string;
+  filename: string | null;
+  title: string | null;
+  authors: string | null;
   timestamp: number;
 }
 
@@ -27,4 +36,5 @@ export interface ProgressUpdateRequest {
   percentage: number;
   device: string;
   device_id: string;
+  metadata?: DocumentMetadata;
 }

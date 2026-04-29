@@ -23,11 +23,25 @@ db.run(`
     percentage REAL NOT NULL,
     device TEXT NOT NULL,
     device_id TEXT NOT NULL,
+    filename TEXT,
+    title TEXT,
+    authors TEXT,
     timestamp INTEGER NOT NULL,
     FOREIGN KEY(user_id) REFERENCES users(id),
     UNIQUE(user_id, document)
   )
 `);
+
+// Migrate existing databases to include metadata columns
+const progressColumns = db
+  .prepare(`PRAGMA table_info(progress)`)
+  .all() as { name: string }[];
+const existingColumnNames = new Set(progressColumns.map((c) => c.name));
+for (const column of ["filename", "title", "authors"]) {
+  if (!existingColumnNames.has(column)) {
+    db.run(`ALTER TABLE progress ADD COLUMN ${column} TEXT`);
+  }
+}
 
 // Create indexes for better performance
 db.run(
