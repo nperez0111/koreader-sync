@@ -110,7 +110,7 @@ app.put("/syncs/progress", authMiddleware, async (c) => {
   const requestId = c.get("requestId");
   const body = await c.req.json<ProgressUpdateRequest>();
 
-  const { document, progress, percentage, device, device_id } = body;
+  const { document, progress, percentage, device, device_id, metadata } = body;
 
   logger.info(
     {
@@ -120,6 +120,7 @@ app.put("/syncs/progress", authMiddleware, async (c) => {
       percentage,
       device,
       device_id,
+      metadata,
     },
     "Progress update received"
   );
@@ -139,20 +140,35 @@ app.put("/syncs/progress", authMiddleware, async (c) => {
   }
 
   const timestamp = Math.floor(Date.now() / 1000);
+  const filename = metadata?.filename ?? null;
+  const title = metadata?.title ?? null;
+  const authors = metadata?.authors ?? null;
 
   try {
     db.prepare(
       `
-      INSERT OR REPLACE INTO progress (
+      INSERT INTO progress (
         user_id,
         document,
         progress,
         percentage,
         device,
         device_id,
+        filename,
+        title,
+        authors,
         timestamp
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(user_id, document) DO UPDATE SET
+        progress = excluded.progress,
+        percentage = excluded.percentage,
+        device = excluded.device,
+        device_id = excluded.device_id,
+        filename = COALESCE(excluded.filename, progress.filename),
+        title = COALESCE(excluded.title, progress.title),
+        authors = COALESCE(excluded.authors, progress.authors),
+        timestamp = excluded.timestamp
     `
     ).run(
       userId as number,
@@ -161,6 +177,9 @@ app.put("/syncs/progress", authMiddleware, async (c) => {
       percentage,
       device,
       device_id,
+      filename,
+      title,
+      authors,
       timestamp
     );
 
@@ -172,6 +191,7 @@ app.put("/syncs/progress", authMiddleware, async (c) => {
         percentage,
         device,
         device_id,
+        metadata,
       },
       "Progress updated successfully"
     );
@@ -238,6 +258,45 @@ app.get("/syncs/progress/:document", authMiddleware, (c) => {
         error: error instanceof Error ? error.message : String(error),
       },
       "Failed to retrieve progress"
+    );
+    throw error;
+  }
+});
+
+// List all synced documents with metadata for the authenticated user
+app.get("/syncs/documents", authMiddleware, (c) => {
+  const userId = c.get("userId");
+  const requestId = c.get("requestId");
+
+  logger.info({ requestId, userId }, "Documents list requested");
+
+  try {
+    const documents = db
+      .prepare(
+        `
+      SELECT document, progress, percentage, device, device_id,
+             filename, title, authors, timestamp
+      FROM progress
+      WHERE user_id = ?
+      ORDER BY timestamp DESC
+    `
+      )
+      .all(userId as number);
+
+    logger.info(
+      { requestId, userId, count: documents.length },
+      "Documents list retrieved"
+    );
+
+    return c.json({ documents });
+  } catch (error) {
+    logger.error(
+      {
+        requestId,
+        userId,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      "Failed to list documents"
     );
     throw error;
   }
