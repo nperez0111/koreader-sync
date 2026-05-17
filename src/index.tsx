@@ -363,6 +363,7 @@ app.get("/", (c) => {
         <meta property="og:type" content="website" />
         <meta property="og:site_name" content="KOReader Sync Server" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="color-scheme" content="light dark" />
         <link
           rel="apple-touch-icon"
           sizes="180x180"
@@ -382,6 +383,48 @@ app.get("/", (c) => {
         />
         <link rel="manifest" href="/public/site.webmanifest" />
         <title>KOReader Sync Server</title>
+        <style>{`
+          :root {
+            --color-bg: #ffffff;
+            --color-text: #1f2937;
+            --color-text-muted: #4b5563;
+            --color-accent: #2563eb;
+            --color-accent-hover: #1d4ed8;
+            --color-surface: #f3f4f6;
+            --color-surface-alt: #f0f9ff;
+            --color-code-bg: #1e1e1e;
+            --color-code-text: #d4d4d4;
+            --color-border: rgba(0, 0, 0, 0.1);
+          }
+          @media (prefers-color-scheme: dark) {
+            :root {
+              --color-bg: #111827;
+              --color-text: #f3f4f6;
+              --color-text-muted: #9ca3af;
+              --color-accent: #60a5fa;
+              --color-accent-hover: #93bbfd;
+              --color-surface: #1f2937;
+              --color-surface-alt: #1e293b;
+              --color-code-bg: #0d1117;
+              --color-code-text: #e6edf3;
+              --color-border: rgba(255, 255, 255, 0.1);
+            }
+          }
+          body {
+            background-color: var(--color-bg);
+            color: var(--color-text);
+            margin: 0;
+          }
+          a { color: var(--color-accent); }
+          a:hover { color: var(--color-accent-hover); }
+          code {
+            background-color: var(--color-surface);
+            padding: 0.125rem 0.375rem;
+            border-radius: 0.25rem;
+            font-size: 0.9em;
+          }
+          h2 { color: var(--color-text); }
+        `}</style>
       </head>
       <body>
         <div
@@ -405,7 +448,7 @@ app.get("/", (c) => {
             <div style={{ flex: "1", minWidth: "300px" }}>
               <h1
                 style={{
-                  color: "#2563eb",
+                  color: "var(--color-accent)",
                   margin: 0,
                   fontSize: "2.5rem",
                   lineHeight: "1.2",
@@ -417,7 +460,7 @@ app.get("/", (c) => {
                 style={{
                   fontSize: "1.125rem",
                   marginTop: "1rem",
-                  color: "#4b5563",
+                  color: "var(--color-text-muted)",
                 }}
               >
                 Keep your reading progress in sync across all your KOReader
@@ -428,7 +471,7 @@ app.get("/", (c) => {
                 style={{
                   marginBottom: "2rem",
                   padding: "0.75rem",
-                  backgroundColor: "#f0f9ff",
+                  backgroundColor: "var(--color-surface-alt)",
                   borderRadius: "0.5rem",
                   display: "inline-block",
                 }}
@@ -438,7 +481,7 @@ app.get("/", (c) => {
                   target="_blank"
                   rel="noopener noreferrer"
                   style={{
-                    color: "#2563eb",
+                    color: "var(--color-accent)",
                     textDecoration: "none",
                     display: "flex",
                     alignItems: "center",
@@ -465,7 +508,7 @@ app.get("/", (c) => {
                   height: "auto",
                   borderRadius: "8px",
                   boxShadow:
-                    "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)",
+                    "0 4px 6px -1px var(--color-border), 0 2px 4px -2px var(--color-border)",
                 }}
               />
             </div>
@@ -496,7 +539,7 @@ app.get("/", (c) => {
 
           <div
             style={{
-              backgroundColor: "#1e1e1e",
+              backgroundColor: "var(--color-code-bg)",
               padding: "1rem",
               borderRadius: "0.5rem",
               overflow: "auto",
@@ -505,7 +548,7 @@ app.get("/", (c) => {
           >
             <pre
               style={{
-                color: "#d4d4d4",
+                color: "var(--color-code-text)",
                 margin: 0,
                 fontFamily: "monospace",
               }}
@@ -551,7 +594,7 @@ volumes:
             style={{
               marginTop: "2rem",
               padding: "1rem",
-              backgroundColor: "#f3f4f6",
+              backgroundColor: "var(--color-surface)",
               borderRadius: "0.5rem",
             }}
           >
