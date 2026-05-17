@@ -67,6 +67,7 @@ bun install
 PASSWORD_SALT="your_secure_random_string"
 PORT=3000
 HOST="0.0.0.0"
+DISABLE_USER_REGISTRATION=false
 ```
 
 3. Run the development server:
@@ -90,6 +91,7 @@ The application uses Pino for structured logging. Logs are output in JSON format
 
 - `LOG_LEVEL`: Set the minimum log level (default: `info`)
 - `NODE_ENV`: Set to `development` for pretty-printed logs, `production` for JSON logs
+- `DISABLE_USER_REGISTRATION`: Set to `true` to block `POST /users/create` (default: `false`)
 
 ### Example Log Output
 
@@ -118,7 +120,7 @@ The application uses Pino for structured logging. Logs are output in JSON format
 - **Headers**:
   - `content-type`: application/json
 - **Body**: `{ "username": "string", "password": "string" }`
-- **Response**: 201 (Created) or 402 (Username exists)
+- **Response**: 201 (Created), 402 (Username exists), or 403 (Registration disabled)
 
 ### Authenticate
 

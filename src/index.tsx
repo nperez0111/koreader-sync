@@ -55,6 +55,13 @@ app.post("/users/create", async (c) => {
   const body = await c.req.json<RegisterRequest>();
   const requestId = c.get("requestId");
 
+  if (config.auth.disableUserRegistration) {
+    logger.warn({ requestId }, "Registration disabled by configuration");
+    throw new HTTPException(403, {
+      message: "User registration is disabled",
+    });
+  }
+
   logger.info(
     { requestId, username: body.username },
     "User registration attempt"
@@ -515,8 +522,9 @@ volumes:
             }}
           >
             <strong>Note:</strong> This server allows registration by any
-            username and password. It does not require any authentication to
-            access the sync server.
+            username and password by default. Set
+            <code> DISABLE_USER_REGISTRATION=true</code> to block new account
+            creation.
           </p>
         </div>
       </body>
