@@ -1,4 +1,4 @@
-# Koreader Sync
+# KOReader Sync
 
 <div style="display: flex; align-items: flex-start; gap: 2rem;">
   <img src="./public/logo.jpg" alt="KOReader Sync Server" width="150">
