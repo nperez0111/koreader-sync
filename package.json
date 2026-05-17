@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "bun run --hot src/index.tsx",
     "build": "bun build ./src/index.tsx --target=bun --outfile server.js",
-    "release": "bumpp"
+    "release": "bumpp --execute 'gh release create v%s --generate-notes'"
   },
   "dependencies": {
     "hono": "4.12.19",
