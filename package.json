@@ -2,7 +2,7 @@
   "name": "koreader-sync",
   "license": "MIT",
   "type": "module",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "scripts": {
     "dev": "bun run --hot src/index.tsx",
     "build": "bun build ./src/index.tsx --target=bun --outfile server.js",
