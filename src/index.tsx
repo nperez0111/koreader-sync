@@ -7,8 +7,13 @@ import { secureHeaders } from "hono/secure-headers";
 import { db } from "./db";
 import { authMiddleware } from "./auth";
 import { loggingMiddleware, errorHandler } from "./middleware";
+import { rateLimiter } from "./rate-limit";
 import logger from "./logger";
-import type { RegisterRequest, ProgressUpdateRequest } from "./types";
+import type {
+  RegisterRequest,
+  ProgressUpdateRequest,
+  Progress,
+} from "./types";
 import config from "./config";
 
 type Variables = {
@@ -50,10 +55,20 @@ app.use("*", loggingMiddleware);
 // Add error handler
 app.onError(errorHandler);
 
+// Rate limit auth-related endpoints
+const authRateLimit = rateLimiter({ windowMs: 60_000, max: 10 });
+app.use("/users/*", authRateLimit);
+
 // Register endpoint
 app.post("/users/create", async (c) => {
-  const body = await c.req.json<RegisterRequest>();
   const requestId = c.get("requestId");
+
+  let body: RegisterRequest;
+  try {
+    body = await c.req.json<RegisterRequest>();
+  } catch {
+    throw new HTTPException(400, { message: "Invalid JSON body" });
+  }
 
   if (config.auth.disableUserRegistration) {
     logger.warn({ requestId }, "Registration disabled by configuration");
@@ -74,6 +89,12 @@ app.post("/users/create", async (c) => {
     );
     throw new HTTPException(400, {
       message: "Username and password are required",
+    });
+  }
+
+  if (body.username.length > 255 || body.password.length > 255) {
+    throw new HTTPException(400, {
+      message: "Username and password must be 255 characters or fewer",
     });
   }
 
@@ -99,7 +120,7 @@ app.post("/users/create", async (c) => {
       },
       "Registration failed: username already exists"
     );
-    return c.json({ error: "Username already exists" }, 402);
+    return c.json({ error: "Username already exists" }, 409);
   }
 });
 
@@ -115,7 +136,13 @@ app.get("/users/auth", authMiddleware, (c) => {
 app.put("/syncs/progress", authMiddleware, async (c) => {
   const userId = c.get("userId");
   const requestId = c.get("requestId");
-  const body = await c.req.json<ProgressUpdateRequest>();
+
+  let body: ProgressUpdateRequest;
+  try {
+    body = await c.req.json<ProgressUpdateRequest>();
+  } catch {
+    throw new HTTPException(400, { message: "Invalid JSON body" });
+  }
 
   const { document, progress, percentage, device, device_id, metadata } = body;
 
@@ -237,7 +264,10 @@ app.get("/syncs/progress/:document", authMiddleware, (c) => {
       LIMIT 1
     `
       )
-      .get(userId as number, document);
+      .get(userId as number, document) as Pick<
+      Progress,
+      "progress" | "percentage" | "device" | "device_id" | "timestamp"
+    > | null;
 
     if (!progress) {
       logger.info({ requestId, userId, document }, "Progress not found");
@@ -249,8 +279,8 @@ app.get("/syncs/progress/:document", authMiddleware, (c) => {
         requestId,
         userId,
         document,
-        percentage: (progress as any).percentage,
-        device: (progress as any).device,
+        percentage: progress.percentage,
+        device: progress.device,
       },
       "Progress retrieved successfully"
     );
@@ -320,10 +350,14 @@ app.get("/", (c) => {
     <html>
       <head>
         <meta charset="UTF-8" />
+        <meta
+          name="description"
+          content="Keep your reading progress in sync across all your KOReader devices."
+        />
         <meta property="og:title" content="KOReader Sync Server" />
         <meta
           property="og:description"
-          content="A lightweight synchronization server for KOReader devices"
+          content="Keep your reading progress in sync across all your KOReader devices."
         />
         <meta property="og:image" content="/public/logo.jpg" />
         <meta property="og:type" content="website" />
@@ -386,8 +420,8 @@ app.get("/", (c) => {
                   color: "#4b5563",
                 }}
               >
-                A lightweight synchronization server for KOReader devices, built
-                with Bun and Hono.
+                Keep your reading progress in sync across all your KOReader
+                devices.
               </p>
 
               <p
@@ -536,7 +570,7 @@ app.use(
   "/public/*",
   serveStatic({
     root: "./public",
-    rewriteRequestPath: (path) => path.replace(/^\/public/, "./"),
+    rewriteRequestPath: (path) => path.replace(/^\/public/, ""),
     mimes: {
       css: "text/css",
       svg: "image/svg+xml",

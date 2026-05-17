@@ -1,4 +1,5 @@
-import { Context, Next } from "hono";
+import type { Context, Next } from "hono";
+import { HTTPException } from "hono/http-exception";
 import logger from "./logger";
 
 export const loggingMiddleware = async (c: Context, next: Next) => {
@@ -6,14 +7,12 @@ export const loggingMiddleware = async (c: Context, next: Next) => {
   const { method, url } = c.req;
   const requestId = c.get("requestId");
 
-  // Log incoming request
   logger.info(
     {
       requestId,
       req: {
         method,
         url,
-        headers: c.req.raw?.headers || {},
       },
     },
     "Incoming request"
@@ -25,13 +24,11 @@ export const loggingMiddleware = async (c: Context, next: Next) => {
     const duration = Date.now() - start;
     const status = c.res.status;
 
-    // Log response
     logger.info(
       {
         requestId,
         res: {
           statusCode: status,
-          headers: c.res.headers || {},
         },
         duration,
       },
@@ -41,7 +38,6 @@ export const loggingMiddleware = async (c: Context, next: Next) => {
     const duration = Date.now() - start;
     const requestId = c.get("requestId");
 
-    // Log error
     logger.error(
       {
         requestId,
@@ -56,6 +52,10 @@ export const loggingMiddleware = async (c: Context, next: Next) => {
 };
 
 export const errorHandler = (error: Error, c: Context) => {
+  if (error instanceof HTTPException) {
+    return error.getResponse();
+  }
+
   const requestId = c.get("requestId");
 
   logger.error(

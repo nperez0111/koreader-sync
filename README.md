@@ -2,7 +2,7 @@
 
 <div style="display: flex; align-items: flex-start; gap: 2rem;">
   <img src="./public/logo.jpg" alt="KOReader Sync Server" width="150">
-  <p style="margin: 0;">A KOReader sync server implementation using Bun and Hono.</p>
+  <p style="margin: 0;">A KOReader sync server implementation.</p>
 </div>
 
 ## Self-Hosting Guide
@@ -120,7 +120,7 @@ The application uses Pino for structured logging. Logs are output in JSON format
 - **Headers**:
   - `content-type`: application/json
 - **Body**: `{ "username": "string", "password": "string" }`
-- **Response**: 201 (Created), 402 (Username exists), or 403 (Registration disabled)
+- **Response**: 201 (Created), 409 (Username exists), or 403 (Registration disabled)
 
 ### Authenticate
 
