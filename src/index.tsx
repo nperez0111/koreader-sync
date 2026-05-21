@@ -1,20 +1,347 @@
+import { Database } from "bun:sqlite";
 import { Hono } from "hono";
 import { serveStatic } from "hono/bun";
 import { HTTPException } from "hono/http-exception";
 import { requestId } from "hono/request-id";
 import type { RequestIdVariables } from "hono/request-id";
 import { secureHeaders } from "hono/secure-headers";
-import { db } from "./db";
-import { authMiddleware } from "./auth";
-import { loggingMiddleware, errorHandler } from "./middleware";
-import { rateLimiter } from "./rate-limit";
-import logger from "./logger";
-import type {
-  RegisterRequest,
-  ProgressUpdateRequest,
-  Progress,
-} from "./types";
-import config from "./config";
+import type { Context, Next } from "hono";
+import pino from "pino";
+
+// =============================================================================
+// Types
+// =============================================================================
+
+interface User {
+  id: number;
+  username: string;
+  password: string;
+  created_at: Date;
+}
+
+interface DocumentMetadata {
+  filename?: string;
+  title?: string;
+  authors?: string;
+}
+
+interface Progress {
+  id: number;
+  user_id: number;
+  document: string;
+  progress: string;
+  percentage: number;
+  device: string;
+  device_id: string;
+  filename: string | null;
+  title: string | null;
+  authors: string | null;
+  timestamp: number;
+}
+
+interface RegisterRequest {
+  username: string;
+  password: string;
+}
+
+interface ProgressUpdateRequest {
+  document: string;
+  progress: string;
+  percentage: number;
+  device: string;
+  device_id: string;
+  metadata?: DocumentMetadata;
+}
+
+// =============================================================================
+// Config
+// =============================================================================
+
+interface Config {
+  password: {
+    salt: string;
+  };
+  auth: {
+    disableUserRegistration: boolean;
+  };
+  server: {
+    port: number;
+    host: string;
+  };
+}
+
+const config: Config = {
+  password: {
+    salt: process.env.PASSWORD_SALT || "default_salt_change_in_production",
+  },
+  auth: {
+    disableUserRegistration:
+      process.env.DISABLE_USER_REGISTRATION?.toLowerCase() === "true",
+  },
+  server: {
+    port: Number(process.env.PORT) || 3000,
+    host: process.env.HOST || "0.0.0.0",
+  },
+};
+
+// =============================================================================
+// Logger
+// =============================================================================
+
+const logger = pino({
+  level: process.env.LOG_LEVEL || "info",
+  transport:
+    process.env.NODE_ENV === "development"
+      ? {
+          target: "pino-pretty",
+          options: {
+            colorize: true,
+            translateTime: "SYS:standard",
+            ignore: "pid,hostname",
+          },
+        }
+      : undefined,
+  serializers: {
+    req: (req: any) => ({
+      method: req.method,
+      url: req.url,
+      headers: req.headers
+        ? {
+            "user-agent": req.headers["user-agent"],
+            "content-type": req.headers["content-type"],
+            authorization: req.headers["authorization"]
+              ? "[REDACTED]"
+              : undefined,
+          }
+        : undefined,
+    }),
+    res: (res: any) => ({
+      statusCode: res.statusCode,
+      headers: res.headers
+        ? {
+            "content-type": res.headers["content-type"],
+          }
+        : undefined,
+    }),
+  },
+});
+
+// =============================================================================
+// Database
+// =============================================================================
+
+const db = new Database("data/koreader-sync.db", {
+  create: true,
+});
+
+db.run(`
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE NOT NULL,
+    password TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )
+`);
+
+db.run(`
+  CREATE TABLE IF NOT EXISTS progress (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    document TEXT NOT NULL,
+    progress TEXT NOT NULL,
+    percentage REAL NOT NULL,
+    device TEXT NOT NULL,
+    device_id TEXT NOT NULL,
+    filename TEXT,
+    title TEXT,
+    authors TEXT,
+    timestamp INTEGER NOT NULL,
+    FOREIGN KEY(user_id) REFERENCES users(id),
+    UNIQUE(user_id, document)
+  )
+`);
+
+// Migrate existing databases to include metadata columns
+const progressColumns = db
+  .prepare(`PRAGMA table_info(progress)`)
+  .all() as { name: string }[];
+const existingColumnNames = new Set(progressColumns.map((c) => c.name));
+for (const column of ["filename", "title", "authors"]) {
+  if (!existingColumnNames.has(column)) {
+    db.run(`ALTER TABLE progress ADD COLUMN ${column} TEXT`);
+  }
+}
+
+db.run(
+  `CREATE INDEX IF NOT EXISTS idx_progress_document ON progress(document)`
+);
+db.run(`CREATE INDEX IF NOT EXISTS idx_progress_user_id ON progress(user_id)`);
+
+// =============================================================================
+// Rate Limiter
+// =============================================================================
+
+interface RateLimitOptions {
+  windowMs: number;
+  max: number;
+}
+
+function rateLimiter({ windowMs, max }: RateLimitOptions) {
+  const hits = new Map<string, { count: number; resetAt: number }>();
+
+  setInterval(() => {
+    const now = Date.now();
+    for (const [key, entry] of hits) {
+      if (now >= entry.resetAt) hits.delete(key);
+    }
+  }, windowMs);
+
+  return async (c: Context, next: Next) => {
+    const key =
+      c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ??
+      c.req.header("x-real-ip") ??
+      "unknown";
+    const now = Date.now();
+    const entry = hits.get(key);
+
+    if (!entry || now >= entry.resetAt) {
+      hits.set(key, { count: 1, resetAt: now + windowMs });
+    } else {
+      entry.count++;
+      if (entry.count > max) {
+        throw new HTTPException(429, { message: "Too many requests" });
+      }
+    }
+
+    await next();
+  };
+}
+
+// =============================================================================
+// Middleware
+// =============================================================================
+
+const loggingMiddleware = async (c: Context, next: Next) => {
+  const start = Date.now();
+  const { method, url } = c.req;
+  const requestId = c.get("requestId");
+
+  logger.info(
+    {
+      requestId,
+      req: {
+        method,
+        url,
+      },
+    },
+    "Incoming request"
+  );
+
+  try {
+    await next();
+
+    const duration = Date.now() - start;
+    const status = c.res.status;
+
+    logger.info(
+      {
+        requestId,
+        res: {
+          statusCode: status,
+        },
+        duration,
+      },
+      "Request completed"
+    );
+  } catch (error) {
+    const duration = Date.now() - start;
+    const requestId = c.get("requestId");
+
+    logger.error(
+      {
+        requestId,
+        err: error,
+        duration,
+      },
+      "Request failed"
+    );
+
+    throw error;
+  }
+};
+
+const errorHandler = (error: Error, c: Context) => {
+  if (error instanceof HTTPException) {
+    return error.getResponse();
+  }
+
+  const requestId = c.get("requestId");
+
+  logger.error(
+    {
+      requestId,
+      err: error,
+      req: {
+        method: c.req.method,
+        url: c.req.url,
+      },
+    },
+    "Unhandled error"
+  );
+
+  return c.json({ error: "Internal server error" }, 500);
+};
+
+// =============================================================================
+// Auth
+// =============================================================================
+
+type AuthVariables = {
+  userId: number;
+};
+
+async function authMiddleware(
+  c: Context<{ Variables: AuthVariables }>,
+  next: Next
+) {
+  const username = c.req.header("x-auth-user");
+  const password = c.req.header("x-auth-key");
+  const requestId = c.get("requestId");
+
+  logger.debug({ requestId, username }, "Authentication attempt");
+
+  if (!username || !password) {
+    logger.warn(
+      { requestId, username },
+      "Authentication failed: missing credentials"
+    );
+    throw new HTTPException(401, { message: "Authentication required" });
+  }
+
+  const user = db
+    .prepare("SELECT id, username, password FROM users WHERE username = ?")
+    .get(username) as User | null;
+
+  const saltedPassword = password + config.password.salt;
+  if (!user || !(await Bun.password.verify(saltedPassword, user.password))) {
+    logger.warn(
+      { requestId, username },
+      "Authentication failed: invalid credentials"
+    );
+    throw new HTTPException(401, { message: "Invalid credentials" });
+  }
+
+  logger.info(
+    { requestId, userId: user.id, username },
+    "Authentication successful"
+  );
+  c.set("userId", user.id);
+  await next();
+}
+
+// =============================================================================
+// App
+// =============================================================================
 
 type Variables = {
   userId: number;
@@ -26,11 +353,8 @@ const app = new Hono<{ Variables: Variables }>();
 app.use(
   "*",
   secureHeaders({
-    // Disable X-Frame-Options for API endpoints (not needed for JSON API)
     xFrameOptions: false,
-    // Keep X-XSS-Protection disabled (modern browsers handle this better)
     xXssProtection: false,
-    // Set a more restrictive CSP for the HTML landing page
     contentSecurityPolicy: {
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'"],
