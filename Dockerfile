@@ -38,4 +38,6 @@ RUN mkdir -p data && \
 
 USER bun
 EXPOSE 3000/tcp
+HEALTHCHECK --interval=5m --timeout=3s \
+  CMD bun -e "fetch('http://localhost:3000/health').then(r => { if (!r.ok) process.exit(1) })"
 ENTRYPOINT [ "bun", "run", "server.js" ]
