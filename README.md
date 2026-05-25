@@ -2,22 +2,32 @@
 
 <div style="display: flex; align-items: flex-start; gap: 2rem;">
   <img src="./public/logo.jpg" alt="KOReader Sync Server" width="150">
-  <p style="margin: 0;">A KOReader sync server implementation.</p>
 </div>
 
-## Self-Hosting Guide
+A self-hostable sync server for [KOReader](https://koreader.rocks/). Keeps reading progress in sync across all your devices.
 
-The easiest way to self-host this sync server is using Docker Compose:
+[![Build](https://github.com/nperez0111/koreader-sync/actions/workflows/docker-build.yml/badge.svg)](https://github.com/nperez0111/koreader-sync/actions/workflows/docker-build.yml)
+[![License: MIT](https://img.shields.io/github/license/nperez0111/koreader-sync)](LICENSE)
+[![GitHub release](https://img.shields.io/github/v/release/nperez0111/koreader-sync)](https://github.com/nperez0111/koreader-sync/releases)
 
-1. Create a new directory for your sync server:
+- Less than 1,000 lines of TypeScript in a single file (`src/index.tsx`)
+- SQLite database — no external services needed
+- Runs on Docker — nothing else to install
+
+**Requirements:** Docker. That's it.
+
+## Quick Start
 
 ```bash
-mkdir koreader-sync && cd koreader-sync
+docker run -d -p 3000:3000 -v koreader-data:/app/data ghcr.io/nperez0111/koreader-sync:latest
 ```
 
-2. Create a `docker-compose.yml` file with the following content:
+The server is now running at `http://localhost:3000`. The SQLite database is persisted in the `koreader-data` volume.
+
+For a more permanent setup, use Docker Compose:
 
 ```yaml
+# docker-compose.yml
 services:
   kosync:
     image: ghcr.io/nperez0111/koreader-sync:latest
@@ -25,7 +35,7 @@ services:
     ports:
       - 3000:3000
     healthcheck:
-      test: ["CMD", "wget" ,"--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
+      test: ["CMD", "bun", "-e", "fetch('http://localhost:3000/health').then(r => { if (!r.ok) process.exit(1) })"]
       interval: 5m
       timeout: 3s
     restart: unless-stopped
@@ -36,109 +46,77 @@ volumes:
   data:
 ```
 
-3. Start the server:
-
 ```bash
 docker compose up -d
 ```
 
-Your sync server will now be running at `http://localhost:3000`. The SQLite database will be automatically persisted in a Docker volume.
+## Connecting KOReader
 
-### Connecting Your KOReader Device
+1. Open a document on your KOReader device
+2. Go to Settings > Progress Sync > Custom sync server
+3. Enter your server's URL (e.g., `http://your-server:3000`)
+4. Select "Register / Login" to create an account
+5. Test with "Push progress from this device now"
+6. Enable automatic progress syncing if desired
 
-1. Open a document on your KOReader device and navigate to Settings → Progress Sync → Custom sync server
-2. Enter your server's URL (e.g., `http://localhost:3000` if running locally)
-3. Select "Register / Login" to create an account or sign in
-4. Test the connection by selecting "Push progress from this device now"
-5. Enable automatic progress syncing in the settings if desired
+## Configuration
 
-## Local Development
+All configuration is through environment variables. None are required — defaults work out of the box.
 
-1. Install dependencies:
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | `3000` | Server port |
+| `HOST` | `0.0.0.0` | Bind address |
+| `PASSWORD_SALT` | `"default_salt_change_in_production"` | Salt for bcrypt password hashing. Change this in production. |
+| `DISABLE_USER_REGISTRATION` | `false` | Set to `true` to block new user registration |
+| `LOG_LEVEL` | `info` | Minimum log level: `debug`, `info`, `warn`, `error` |
+| `NODE_ENV` | — | Set to `development` for pretty-printed logs, otherwise JSON |
 
-```bash
-bun install
+Pass them to Docker with `-e` flags or in your `docker-compose.yml`:
+
+```yaml
+services:
+  kosync:
+    image: ghcr.io/nperez0111/koreader-sync:latest
+    environment:
+      - PASSWORD_SALT=your_secure_random_string
+      - DISABLE_USER_REGISTRATION=true
+    # ...
 ```
 
-2. Set up environment variables:
+## Security
 
-```bash
-# Create a .env file with the following variables (change values as needed):
-PASSWORD_SALT="your_secure_random_string"
-PORT=3000
-HOST="0.0.0.0"
-DISABLE_USER_REGISTRATION=false
-```
+Built in:
 
-3. Run the development server:
+- Passwords are hashed with bcrypt (with configurable salt)
+- Rate limiting on auth endpoints (10 requests/min per IP)
+- Input validation on all endpoints (required fields, length limits)
+- Parameterized SQL queries (no injection risk)
 
-```bash
-bun run dev
-```
+For production, you should also:
 
-## Logging
-
-The application uses Pino for structured logging. Logs are output in JSON format in production and pretty-printed in development.
-
-### Log Levels
-
-- `debug`: Detailed information for debugging (health checks, auth attempts)
-- `info`: General information about application flow (user actions, successful operations)
-- `warn`: Warning messages (authentication failures, validation errors)
-- `error`: Error messages (database errors, unhandled exceptions)
-
-### Environment Variables
-
-- `LOG_LEVEL`: Set the minimum log level (default: `info`)
-- `NODE_ENV`: Set to `development` for pretty-printed logs, `production` for JSON logs
-- `DISABLE_USER_REGISTRATION`: Set to `true` to block `POST /users/create` (default: `false`)
-
-### Example Log Output
-
-```json
-{
-  "level": 30,
-  "time": 1703123456789,
-  "msg": "User registered successfully",
-  "username": "john_doe"
-}
-```
-
-### Logging Features
-
-- **Request/Response Logging**: All HTTP requests and responses are automatically logged
-- **Structured Data**: All logs include relevant context (user IDs, document names, etc.)
-- **Error Tracking**: Comprehensive error logging with stack traces
-- **Performance Monitoring**: Request duration tracking
-- **Security**: Sensitive data like passwords are never logged
+- Put the server behind a reverse proxy with HTTPS (e.g., Caddy, Traefik, nginx)
+- Use a strong, random `PASSWORD_SALT`
+- Back up the SQLite database regularly (located at `/app/data/koreader-sync.db`)
 
 ## API Endpoints
 
 ### Register User
 
 - **POST** `/users/create`
-- **Headers**:
-  - `content-type`: application/json
 - **Body**: `{ "username": "string", "password": "string" }`
-- **Response**: 201 (Created), 409 (Username exists), or 403 (Registration disabled)
+- **Response**: `201` Created, `409` Username exists, `403` Registration disabled
 
 ### Authenticate
 
 - **GET** `/users/auth`
-- **Headers**:
-  - `x-auth-user`: Username
-  - `x-auth-key`: Password/API Key
-  - `accept`: application/vnd.koreader.v1+json
-- **Response**: 200 (OK) or 401 (Unauthorized)
+- **Headers**: `x-auth-user`, `x-auth-key`
+- **Response**: `200` OK, `401` Unauthorized
 
 ### Update Progress
 
 - **PUT** `/syncs/progress`
-- **Headers**:
-  - `x-auth-user`: Username
-  - `x-auth-key`: Password/API Key
-  - `accept`: application/vnd.koreader.v1+json
-  - `content-type`: application/json
+- **Headers**: `x-auth-user`, `x-auth-key`
 - **Body**:
 
 ```json
@@ -156,29 +134,23 @@ The application uses Pino for structured logging. Logs are output in JSON format
 }
 ```
 
-The `metadata` field is optional. KOReader sends it only when the user enables the "Send document metadata" toggle in the KOSync settings (see [koreader/koreader#15306](https://github.com/koreader/koreader/pull/15306)). When omitted, previously stored metadata for the document is preserved.
+The `metadata` field is optional. KOReader sends it when "Send document metadata" is enabled in KOSync settings (see [koreader/koreader#15306](https://github.com/koreader/koreader/pull/15306)). Previously stored metadata is preserved when omitted.
 
-- **Response**: 200 (OK) or 401 (Unauthorized)
+- **Response**: `200` OK, `401` Unauthorized
 
 ### Get Progress
 
 - **GET** `/syncs/progress/:document`
-- **Headers**:
-  - `x-auth-user`: Username
-  - `x-auth-key`: Password/API Key
-  - `accept`: application/vnd.koreader.v1+json
-- **Response**: 200 (OK) with progress data or 404 (Not Found)
+- **Headers**: `x-auth-user`, `x-auth-key`
+- **Response**: `200` OK with progress data, `404` Not found
 
 ### List Documents
 
-Returns every document the authenticated user has synced, including any captured metadata, ordered by most recently updated. This endpoint is specific to this server — the official KOReader client does not call it, but it is useful for building dashboards or browsing your synced library.
+Returns all synced documents for the authenticated user, ordered by most recently updated. This endpoint is not used by the KOReader client — it's available for building dashboards or browsing your library.
 
 - **GET** `/syncs/documents`
-- **Headers**:
-  - `x-auth-user`: Username
-  - `x-auth-key`: Password/API Key
-  - `accept`: application/vnd.koreader.v1+json
-- **Response**: 200 (OK)
+- **Headers**: `x-auth-user`, `x-auth-key`
+- **Response**: `200` OK
 
 ```json
 {
@@ -198,22 +170,18 @@ Returns every document the authenticated user has synced, including any captured
 }
 ```
 
-`filename`, `title`, and `authors` will be `null` for documents synced before metadata was sent (or when the KOReader toggle is off).
+`filename`, `title`, and `authors` are `null` for documents synced before metadata support was added.
 
-## Security Features
+### Health Check
 
-1. **Password Hashing**: All passwords are hashed using bcrypt with additional salt
-2. **Custom Headers**: Uses KOReader's custom authentication headers
-3. **SQLite Security**: Uses parameterized queries to prevent SQL injection
-4. **Environment Variables**: Sensitive configuration like password salt is loaded from environment variables
+- **GET** `/health`
+- **Response**: `200` `{"status": "ok"}`
 
-## Additional Security Recommendations
+## Local Development
 
-For production use, you should also:
+```bash
+bun install
+bun run dev
+```
 
-1. Use HTTPS to encrypt all traffic
-2. Implement rate limiting to prevent brute force attacks
-3. Add input validation and sanitization
-4. Regularly backup the SQLite database (located in `/app/data/koreader-sync.db`)
-5. Consider adding request signing for additional security
-6. Use a strong, random PASSWORD_SALT in production
+The dev server runs with hot reload. Create a `.env` file to configure environment variables locally (see [Configuration](#configuration)).

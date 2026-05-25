@@ -676,12 +676,12 @@ app.get("/", (c) => {
         <meta charset="UTF-8" />
         <meta
           name="description"
-          content="Keep your reading progress in sync across all your KOReader devices."
+          content="A self-hostable sync server for KOReader. Keeps reading progress in sync across all your devices."
         />
         <meta property="og:title" content="KOReader Sync Server" />
         <meta
           property="og:description"
-          content="Keep your reading progress in sync across all your KOReader devices."
+          content="A self-hostable sync server for KOReader. Keeps reading progress in sync across all your devices."
         />
         <meta property="og:image" content="/public/logo.jpg" />
         <meta property="og:type" content="website" />
@@ -787,9 +787,24 @@ app.get("/", (c) => {
                   color: "var(--color-text-muted)",
                 }}
               >
-                Keep your reading progress in sync across all your KOReader
-                devices.
+                A self-hostable sync server for KOReader. Keeps reading progress
+                in sync across all your devices.
               </p>
+
+              <ul
+                style={{
+                  color: "var(--color-text-muted)",
+                  paddingLeft: "1.25rem",
+                  margin: "0.75rem 0",
+                  lineHeight: "1.8",
+                }}
+              >
+                <li>
+                  Less than 1,000 lines of TypeScript in a single file
+                </li>
+                <li>SQLite database — no external services needed</li>
+                <li>Runs on Docker — nothing else to install</li>
+              </ul>
 
               <p
                 style={{
@@ -812,7 +827,7 @@ app.get("/", (c) => {
                     gap: "0.5rem",
                   }}
                 >
-                  📦 View source code on GitHub
+                  View source on GitHub
                 </a>
               </p>
             </div>
@@ -838,29 +853,57 @@ app.get("/", (c) => {
             </div>
           </div>
 
-          <h2>Getting Started</h2>
-          <p>To use this sync server with your KOReader device:</p>
+          <h2>Connecting KOReader</h2>
           <ol>
             <li>
-              Open a document on your KOReader device and navigate to Settings →
-              Progress Sync → Custom sync server. Enter this server's URL.
+              Open a document on your KOReader device and go to Settings →
+              Progress Sync → Custom sync server
+            </li>
+            <li>Enter this server's URL</li>
+            <li>
+              Select "Register / Login" to create an account
             </li>
             <li>
-              Select "Register / Login" to create an account or sign in with
-              your credentials.
+              Test with "Push progress from this device now"
             </li>
             <li>
-              Test the connection by selecting "Push progress from this device
-              now". You'll receive a confirmation message.
-            </li>
-            <li>
-              Enable automatic progress syncing in the settings if desired.
+              Enable automatic progress syncing if desired
             </li>
           </ol>
 
-          <h2>Self-Hosting Guide</h2>
-          <p>Set up your own sync server easily using Docker Compose:</p>
+          <h2>Self-Hosting</h2>
+          <p>
+            <strong>Requirements:</strong> Docker. That's it.
+          </p>
 
+          <h3 style={{ fontSize: "1.1rem" }}>Quick Start</h3>
+          <div
+            style={{
+              backgroundColor: "var(--color-code-bg)",
+              padding: "1rem",
+              borderRadius: "0.5rem",
+              overflow: "auto",
+              marginBottom: "1rem",
+            }}
+          >
+            <pre
+              style={{
+                color: "var(--color-code-text)",
+                margin: 0,
+                fontFamily: "monospace",
+              }}
+            >
+              {`docker run -d -p 3000:3000 -v koreader-data:/app/data ghcr.io/nperez0111/koreader-sync:latest`}
+            </pre>
+          </div>
+          <p>
+            The server is now running at <code>http://localhost:3000</code>.
+            The SQLite database is persisted in the{" "}
+            <code>koreader-data</code> volume.
+          </p>
+
+          <h3 style={{ fontSize: "1.1rem" }}>Docker Compose</h3>
+          <p>For a more permanent setup:</p>
           <div
             style={{
               backgroundColor: "var(--color-code-bg)",
@@ -884,7 +927,7 @@ app.get("/", (c) => {
     ports:
       - 3000:3000
     healthcheck:
-      test: ["CMD", "wget" ,"--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
+      test: ["CMD", "bun", "-e", "fetch('http://localhost:3000/health').then(r => { if (!r.ok) process.exit(1) })"]
       interval: 5m
       timeout: 3s
     restart: unless-stopped
@@ -895,24 +938,10 @@ volumes:
   data:`}
             </pre>
           </div>
-
-          <ol style={{ marginBottom: "2rem" }}>
-            <li>Create a new directory for your sync server</li>
-            <li>
-              Save the above configuration as <code>docker-compose.yml</code>
-            </li>
-            <li>
-              Run <code>docker compose up -d</code> to start the server
-            </li>
-            <li>
-              Your server will be available at{" "}
-              <code>http://localhost:3000</code>
-            </li>
-            <li>
-              The SQLite database will be automatically persisted in a Docker
-              volume at <code>/app/data</code>
-            </li>
-          </ol>
+          <p>
+            Save as <code>docker-compose.yml</code> and run{" "}
+            <code>docker compose up -d</code>.
+          </p>
 
           <p
             style={{
@@ -922,10 +951,9 @@ volumes:
               borderRadius: "0.5rem",
             }}
           >
-            <strong>Note:</strong> This server allows registration by any
-            username and password by default. Set
-            <code> DISABLE_USER_REGISTRATION=true</code> to block new account
-            creation.
+            <strong>Note:</strong> Registration is open by default. Set{" "}
+            <code>DISABLE_USER_REGISTRATION=true</code> to block new
+            accounts after you've registered.
           </p>
         </div>
       </body>
