@@ -32,9 +32,7 @@ COPY --from=prerelease /usr/src/app/server.js .
 COPY --from=prerelease /usr/src/app/public/ ./public
 ENV NODE_ENV=production
 
-# Install wget and set up permissions
-RUN apk add --no-cache wget && \
-  mkdir -p data && \
+RUN mkdir -p data && \
   chown -R bun:bun /app && \
   chmod 755 /app
 
