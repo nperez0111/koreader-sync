@@ -926,10 +926,6 @@ app.get("/", (c) => {
     container_name: kosync
     ports:
       - 3000:3000
-    healthcheck:
-      test: ["CMD", "bun", "-e", "fetch('http://localhost:3000/health').then(r => { if (!r.ok) process.exit(1) })"]
-      interval: 5m
-      timeout: 3s
     restart: unless-stopped
     volumes:
       - data:/app/data

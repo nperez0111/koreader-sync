@@ -6,13 +6,3 @@ services:
     volumes:
       - ./data:/app/data
     restart: unless-stopped
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "bun",
-          "-e",
-          "fetch('http://localhost:3000/health').then(r => { if (!r.ok) process.exit(1) })",
-        ]
-      interval: 5m
-      timeout: 3s
