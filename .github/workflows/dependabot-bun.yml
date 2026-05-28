@@ -21,7 +21,7 @@ jobs:
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
 
       - name: Update lockfile
-        run: bun install --frozen-lockfile=false
+        run: bun install
 
       - name: Commit and push updated lockfile
         env:
