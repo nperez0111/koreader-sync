@@ -609,7 +609,7 @@ app.get("/syncs/progress/:document", authMiddleware, (c) => {
       "Progress retrieved successfully"
     );
 
-    return c.json(progress);
+    return c.json({ document, ...progress });
   } catch (error) {
     logger.error(
       {
