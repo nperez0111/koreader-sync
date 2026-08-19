@@ -9,12 +9,12 @@
     "release": "bumpp && gh release create v$(bun -e \"const p = require('./package.json'); process.stdout.write(p.version)\") --generate-notes"
   },
   "dependencies": {
-    "hono": "4.13.0",
+    "hono": "4.13.1",
     "pino": "10.3.1",
     "pino-pretty": "13.1.3"
   },
   "devDependencies": {
     "@types/bun": "1.3.14",
-    "bumpp": "12.1.1"
+    "bumpp": "12.2.0"
   }
 }
